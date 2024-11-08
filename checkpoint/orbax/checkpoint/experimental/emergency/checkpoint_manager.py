@@ -148,7 +148,11 @@ def local_checkpoint_handler() -> PyTreeCheckpointHandler:
   local_registry = type_handlers.create_type_handler_registry(
       (
           jax.Array,
-          type_handlers.ArrayHandler(primary_host=None, replica_id=None),
+          type_handlers.ArrayHandler(
+              primary_host=None,
+              replica_id=None,
+              use_replica_parallel=False,
+          ),
       ),
   )
   return PyTreeCheckpointHandler(
@@ -173,7 +177,11 @@ def _local_checkpoint_handler(
   local_registry = type_handlers.create_type_handler_registry(
       (
           jax.Array,
-          type_handlers.ArrayHandler(primary_host=None, replica_id=None),
+          type_handlers.ArrayHandler(
+              primary_host=None,
+              replica_id=None,
+              use_replica_parallel=False,
+          ),
       ),
   )
   return PyTreeCheckpointHandler(

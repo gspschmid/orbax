@@ -318,6 +318,7 @@ def get_json_tspec_read(
 
 # TODO: b/354139177 - Replace usages of this with `build_array_tspec_write`
 # and remove it.
+# TODO(gsps): This seems to be dead code now?
 def get_json_tspec_write(
     info: ParamInfo,
     use_ocdbt: bool,
@@ -1096,6 +1097,7 @@ class ArrayHandler(TypeHandler):
       metadata_key: Optional[str] = None,
       primary_host: Optional[int] = 0,
       replica_id: Optional[int] = 0,
+      use_replica_parallel: bool = True,
       enable_write_sharding_file: bool = True,
   ):
     """Constructor.
@@ -1108,6 +1110,7 @@ class ArrayHandler(TypeHandler):
       replica_id: the replica id to be used for saving.  Default to 0.  If it's
         set to None, each shards will pick first replica_id to be used.  It's
         useful in the case that all hosts are only working with local storage.
+      use_replica_parallel: Whether to parallelize saving across replicas.
       enable_write_sharding_file: whether to write sharding file, defaults to
         True.
     """
@@ -1115,11 +1118,13 @@ class ArrayHandler(TypeHandler):
     self._primary_host = primary_host
     self._replica_id = replica_id
     self._enable_write_sharding_file = enable_write_sharding_file
+    self._use_replica_parallel = use_replica_parallel
 
     logging.info(
-        'Created `ArrayHandler` with primary_host=%s, replica_id=%s',
+        'Created `ArrayHandler` with primary_host=%s, replica_id=%s, use_replica_parallel=%s',
         self._primary_host,
         self._replica_id,
+        self._use_replica_parallel,
     )
 
     if self._primary_host is None and jax.__version_info__ <= (0, 4, 25):  # pylint:disable=unreachable
@@ -1324,6 +1329,7 @@ class ArrayHandler(TypeHandler):
     values_on_host = replica_slices.transfer_arrays_to_host(
         values,
         self._replica_id,
+        self._use_replica_parallel,
         enable_pinned_host_transfer=infos[0].enable_pinned_host_transfer,
     )
 
@@ -1457,6 +1463,7 @@ class ArrayHandler(TypeHandler):
           replica_slices.get_replica_slices(
               v,
               replica_id=self._replica_id,
+              use_replica_parallel=self._use_replica_parallel,
           ).nbytes
       )
       read_sizes.append(

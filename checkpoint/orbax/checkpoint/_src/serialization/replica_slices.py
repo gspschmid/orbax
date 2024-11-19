@@ -195,7 +195,9 @@ def get_replica_slices(
     # is evenly divisible across replicas.
     replica_counts = _get_replica_counts(arr)
     replica_count = replica_counts(shard0)
+    print(f'maybe_pick_replica_parallel: start arr_shape={arr.shape} shard_shape={shard0.data.shape} {replica_count=}')
     if shard0.data.size == 0 or replica_count == 1:
+      print(f'maybe_pick_replica_parallel: bail-empty-or-unreplicated shard_size={shard0.data.size} {replica_count=}')
       return None
     try:
       axis = next(
@@ -204,6 +206,7 @@ def get_replica_slices(
           if axis_size % replica_count == 0
       )
     except StopIteration:
+      print(f'maybe_pick_replica_parallel: bail-not-evenly-divisble shard_shape={shard0.data.shape} {replica_count=}')
       return None
     local_shape = tuple(
         axis_size // (replica_count if axis_index == axis else 1)
@@ -234,19 +237,18 @@ def get_replica_slices(
           )
       )
 
+    print(f'maybe_pick_replica_parallel: success {axis=} {replica_count=} num_replica_slices={len(rslices)} {local_shape=}')
     return rslices, local_shape
 
-  if logging.vlog_is_on(1):
-    logging.vlog(
-        1,
-        '[process=%d] get_replica_slices: replica_id=%d, shards=[%s]',
-        multihost.process_index(),
-        replica_id,
-        ', '.join([
-            f'Shard(index={shard.index}, replica_id={shard.replica_id})'
-            for shard in arr.addressable_shards
-        ]),
-    )
+  print(
+      '[process=%d] get_replica_slices: replica_id=%d, shards=[%s]',
+      multihost.process_index(),
+      replica_id,
+      ', '.join([
+          f'Shard(index={shard.index}, replica_id={shard.replica_id})'
+          for shard in arr.addressable_shards
+      ]),
+  )
 
   # In order for all processes to agree on the right serialization metadata
   # we want to compute the correct local shape regardless of whether there
@@ -254,7 +256,7 @@ def get_replica_slices(
   rslices, local_shape = (
       use_replica_parallel and maybe_pick_replica_parallel() or pick_single_replica()
   )
-  return ReplicaSlices(
+  res = ReplicaSlices(
       global_shape=arr.shape,
       local_shape=local_shape,
       sharding=arr.sharding,
@@ -262,6 +264,8 @@ def get_replica_slices(
       is_on_host=False,
       replica_slices=rslices,
   )
+  print(f'get_replica_slices: arr.sharding={arr.sharding} num_replica_slices={len(rslices)}')
+  return res
 
 
 def transfer_arrays_to_host(
